@@ -7,7 +7,7 @@ use tokio::sync::broadcast::error::SendError;
 use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use tracing::error;
+use tracing::{error, warn};
 use yrs::encoding::write::Write;
 use yrs::sync::protocol::{MSG_SYNC, MSG_SYNC_UPDATE};
 use yrs::sync::{DefaultProtocol, Error, Message, Protocol, SyncMessage};
@@ -69,8 +69,8 @@ impl BroadcastGroup {
             changed.extend_from_slice(updated);
             changed.extend_from_slice(removed);
 
-            if let Err(_) = tx.send(changed) {
-                tracing::warn!("failed to send awareness update");
+            if tx.send(changed).is_err() {
+                warn!("failed to send awareness update");
             }
         });
         drop(lock);
@@ -80,12 +80,12 @@ impl BroadcastGroup {
                     let awareness = awareness.read().await;
                     match awareness.update_with_clients(changed_clients) {
                         Ok(update) => {
-                            if let Err(_) = sink.send(Message::Awareness(update).encode_v1()) {
-                                tracing::warn!("couldn't broadcast awareness update");
+                            if sink.send(Message::Awareness(update).encode_v1()).is_err() {
+                                warn!("couldn't broadcast awareness update");
                             }
                         }
                         Err(e) => {
-                            tracing::warn!("error while computing awareness update: {}", e)
+                            warn!("error while computing awareness update: {}", e)
                         }
                     }
                 } else {
@@ -202,34 +202,34 @@ impl BroadcastGroup {
             Message::Sync(msg) => match msg {
                 SyncMessage::SyncStep1(state_vector) => {
                     let awareness = awareness.read().await;
-                    protocol.handle_sync_step1(&*awareness, state_vector)
+                    protocol.handle_sync_step1(&awareness, state_vector)
                 }
                 SyncMessage::SyncStep2(update) => {
                     let mut awareness = awareness.write().await;
                     let update = Update::decode_v1(&update)?;
-                    protocol.handle_sync_step2(&mut *awareness, update)
+                    protocol.handle_sync_step2(&mut awareness, update)
                 }
                 SyncMessage::Update(update) => {
                     let mut awareness = awareness.write().await;
                     let update = Update::decode_v1(&update)?;
-                    protocol.handle_sync_step2(&mut *awareness, update)
+                    protocol.handle_sync_step2(&mut awareness, update)
                 }
             },
             Message::Auth(deny_reason) => {
                 let awareness = awareness.read().await;
-                protocol.handle_auth(&*awareness, deny_reason)
+                protocol.handle_auth(&awareness, deny_reason)
             }
             Message::AwarenessQuery => {
                 let awareness = awareness.read().await;
-                protocol.handle_awareness_query(&*awareness)
+                protocol.handle_awareness_query(&awareness)
             }
             Message::Awareness(update) => {
                 let mut awareness = awareness.write().await;
-                protocol.handle_awareness_update(&mut *awareness, update)
+                protocol.handle_awareness_update(&mut awareness, update)
             }
             Message::Custom(tag, data) => {
                 let mut awareness = awareness.write().await;
-                protocol.missing_handle(&mut *awareness, tag, data)
+                protocol.missing_handle(&mut awareness, tag, data)
             }
         }
     }

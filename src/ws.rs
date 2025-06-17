@@ -96,9 +96,9 @@ impl From<SplitSink<WebSocket, Message>> for AxumSink {
     }
 }
 
-impl Into<SplitSink<WebSocket, Message>> for AxumSink {
-    fn into(self) -> SplitSink<WebSocket, Message> {
-        self.0
+impl From<AxumSink> for SplitSink<WebSocket, Message> {
+    fn from(val: AxumSink) -> Self {
+        val.0
     }
 }
 
@@ -197,9 +197,9 @@ impl From<SplitStream<WebSocket>> for AxumStream {
     }
 }
 
-impl Into<SplitStream<WebSocket>> for AxumStream {
-    fn into(self) -> SplitStream<WebSocket> {
-        self.0
+impl From<AxumStream> for SplitStream<WebSocket> {
+    fn from(val: AxumStream) -> Self {
+        val.0
     }
 }
 

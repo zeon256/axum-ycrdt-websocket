@@ -141,7 +141,7 @@ where
             processing_loop,
             awareness,
             inbox,
-            _stream: PhantomData::default(),
+            _stream: PhantomData,
         }
     }
 
@@ -155,7 +155,7 @@ where
         let reader = MessageReader::new(&mut decoder);
         for r in reader {
             let msg = r?;
-            if let Some(reply) = handle_msg(protocol, &awareness, msg).await? {
+            if let Some(reply) = handle_msg(protocol, awareness, msg).await? {
                 let mut sender = sink.lock().await;
                 if let Err(e) = sender.send(reply.encode_v1()).await {
                     error!("connection failed to send back the reply");
