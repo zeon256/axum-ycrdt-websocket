@@ -161,7 +161,8 @@ impl BroadcastGroup {
                     let mut sink = sink.lock().await;
                     if let Err(e) = sink.send(msg).await {
                         error!("broadcast failed to sent sync message");
-                        return Err(Error::Other(Box::new(e)));
+                        // return Err(Error::Other(Box::new(e)));
+                        break;
                     }
                 }
                 Ok(())
