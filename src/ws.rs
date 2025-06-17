@@ -203,17 +203,56 @@ impl From<AxumStream> for SplitStream<WebSocket> {
     }
 }
 
+// impl Stream for AxumStream {
+//     type Item = Result<Vec<u8>, Error>;
+
+//     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+//         match Pin::new(&mut self.0).poll_next(cx) {
+//             Poll::Pending => Poll::Pending,
+//             Poll::Ready(None) => Poll::Ready(None),
+//             Poll::Ready(Some(res)) => match res {
+//                 Ok(item) => Poll::Ready(Some(Ok(item.into_data()))),
+//                 Err(e) => Poll::Ready(Some(Err(Error::Other(e.into())))),
+//             },
+//         }
+//     }
+// }
+
 impl Stream for AxumStream {
     type Item = Result<Vec<u8>, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.0).poll_next(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(res)) => match res {
-                Ok(item) => Poll::Ready(Some(Ok(item.into_data()))),
-                Err(e) => Poll::Ready(Some(Err(Error::Other(e.into())))),
-            },
+        loop {
+            // We loop here to ignore Ping/Pong and poll again.
+            match Pin::new(&mut self.0).poll_next(cx) {
+                Poll::Pending => return Poll::Pending,
+                // The underlying stream has ended.
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Ready(Some(res)) => match res {
+                    Ok(msg) => match msg {
+                        // We only care about Binary and Text messages.
+                        axum::extract::ws::Message::Binary(bin) => {
+                            return Poll::Ready(Some(Ok(bin)));
+                        }
+                        axum::extract::ws::Message::Text(text) => {
+                            // y-websocket can sometimes send text, though binary is standard.
+                            // It's safe to treat it as a binary payload.
+                            return Poll::Ready(Some(Ok(text.into_bytes())));
+                        }
+                        // This indicates a graceful client-side close.
+                        // We should terminate the stream by returning `None`.
+                        axum::extract::ws::Message::Close(_) => {
+                            return Poll::Ready(None);
+                        }
+                        // Axum handles pings/pongs automatically. We can ignore them.
+                        axum::extract::ws::Message::Ping(_)
+                        | axum::extract::ws::Message::Pong(_) => {
+                            continue;
+                        }
+                    },
+                    Err(e) => return Poll::Ready(Some(Err(Error::Other(e.into())))),
+                },
+            }
         }
     }
 }
