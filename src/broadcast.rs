@@ -159,15 +159,15 @@ impl BroadcastGroup {
             tokio::spawn(async move {
                 while let Ok(msg) = receiver.recv().await {
                     let mut sink = sink.lock().await;
-                    if let Err(e) = sink.send(msg).await {
+                    if let Err(_e) = sink.send(msg).await {
                         error!("broadcast failed to sent sync message");
-                        // return Err(Error::Other(Box::new(e)));
                         break;
                     }
                 }
                 Ok(())
             })
         };
+
         let stream_task = {
             let awareness = self.awareness().clone();
             tokio::spawn(async move {
@@ -178,9 +178,13 @@ impl BroadcastGroup {
                         None => {}
                         Some(reply) => {
                             let mut sink = sink.lock().await;
-                            sink.send(reply.encode_v1())
-                                .await
-                                .map_err(|e| Error::Other(Box::new(e)))?;
+                            if let Err(e) = sink.send(reply.encode_v1()).await {
+                                tracing::debug!(
+                                    "Failed to send reply to client, connection closed: {}",
+                                    e
+                                );
+                                break;
+                            }
                         }
                     }
                 }
