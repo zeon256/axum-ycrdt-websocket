@@ -9,6 +9,7 @@ use std::task::{Context, Poll};
 use tokio::spawn;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tracing::error;
 use yrs::encoding::read::Cursor;
 use yrs::sync::Awareness;
 use yrs::sync::{DefaultProtocol, Error, Message, MessageReader, Protocol, SyncMessage};
@@ -157,10 +158,10 @@ where
             if let Some(reply) = handle_msg(protocol, &awareness, msg).await? {
                 let mut sender = sink.lock().await;
                 if let Err(e) = sender.send(reply.encode_v1()).await {
-                    println!("connection failed to send back the reply");
+                    error!("connection failed to send back the reply");
                     return Err(e.into());
                 } else {
-                    println!("connection send back the reply");
+                    error!("connection send back the reply");
                 }
             }
         }

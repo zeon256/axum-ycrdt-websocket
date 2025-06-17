@@ -7,6 +7,7 @@ use tokio::sync::broadcast::error::SendError;
 use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tracing::error;
 use yrs::encoding::write::Write;
 use yrs::sync::protocol::{MSG_SYNC, MSG_SYNC_UPDATE};
 use yrs::sync::{DefaultProtocol, Error, Message, Protocol, SyncMessage};
@@ -159,7 +160,7 @@ impl BroadcastGroup {
                 while let Ok(msg) = receiver.recv().await {
                     let mut sink = sink.lock().await;
                     if let Err(e) = sink.send(msg).await {
-                        println!("broadcast failed to sent sync message");
+                        error!("broadcast failed to sent sync message");
                         return Err(Error::Other(Box::new(e)));
                     }
                 }

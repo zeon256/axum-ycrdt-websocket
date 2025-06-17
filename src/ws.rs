@@ -1,10 +1,10 @@
 use crate::conn::Connection;
 use crate::AwarenessRef;
+use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Stream, StreamExt};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use axum::extract::ws::{Message, WebSocket};
 use yrs::sync::Error;
 
 /// Connection Wrapper over a [WebSocket], which implements a Yjs/Yrs awareness and update exchange
@@ -223,6 +223,7 @@ mod test {
     use crate::broadcast::BroadcastGroup;
     use crate::conn::Connection;
     use crate::ws::{AxumSink, AxumStream};
+    use axum::extract::ws::{WebSocket, WebSocketUpgrade};
     use axum::response::IntoResponse;
     use axum::routing::get;
     use axum::{Extension, Router};
@@ -241,8 +242,8 @@ mod test {
     use tokio::time::{sleep, timeout};
     use tokio_tungstenite::tungstenite::Message;
     use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-    use axum::extract::ws::{WebSocket, WebSocketUpgrade};
-    
+    use tracing::{error, info};
+
     use yrs::sync::{Awareness, Error};
     use yrs::updates::encoder::Encode;
     use yrs::{Doc, GetString, Subscription, Text, Transact};
@@ -268,7 +269,10 @@ mod test {
         }))
     }
 
-    async fn ws_handler(ws: WebSocketUpgrade, Extension(bcast): Extension<Arc<BroadcastGroup>>) -> impl IntoResponse {
+    async fn ws_handler(
+        ws: WebSocketUpgrade,
+        Extension(bcast): Extension<Arc<BroadcastGroup>>,
+    ) -> impl IntoResponse {
         ws.on_upgrade(move |socket| peer(socket, bcast))
     }
 
@@ -278,8 +282,8 @@ mod test {
         let stream = AxumStream::from(stream);
         let sub = bcast.subscribe(sink, stream);
         match sub.completed().await {
-            Ok(_) => println!("broadcasting for channel finished successfully"),
-            Err(e) => eprintln!("broadcasting for channel finished abruptly: {}", e),
+            Ok(_) => info!("broadcasting for channel finished successfully"),
+            Err(e) => error!("broadcasting for channel finished abruptly: {}", e),
         }
     }
 
